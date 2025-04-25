@@ -380,7 +380,8 @@ class FacialRecognitionSystem:
         self.known_faces_dir = "known_faces"
         self.logs_dir = "logs"
         self.intruder_dir = "intruder"
-        self.log_file = "arrival_logs.csv"
+        self.log_file = os.path.join(self.logs_dir, "arrival_logs.csv")
+        self.intruder_log_file= os.path.join(self.logs_dir, "intruder_logs.csv")
         self.log_counter = 1
 
         # Create required directories
@@ -389,8 +390,9 @@ class FacialRecognitionSystem:
                 os.makedirs(directory)
                 print(f"Created directory: {directory}")
 
-        # Create or reset log file
+        # Create or reset log files
         self.init_log_file(reset=reset_logs)
+        self.init_intruder_log_file(reset=reset_logs)
 
         # Initialize log counter
         if not reset_logs:
@@ -416,6 +418,22 @@ class FacialRecognitionSystem:
         else:
             print(f"Log file exists at: {self.log_file}")
 
+    def init_intruder_log_file(self, reset=False):
+        """Initialize the intruder log file with headers, optionally resetting the file."""
+        needs_headers = reset or not os.path.exists(self.intruder_log_file) or os.path.getsize(
+            self.intruder_log_file) == 0
+
+        if needs_headers:
+            try:
+                with open(self.intruder_log_file, 'w', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow(['Date', 'Time', 'Image Path'])
+                print(f"{'Reset' if reset else 'Created'} intruder log file: {self.intruder_log_file}")
+            except Exception as e:
+                print(f"Error {'resetting' if reset else 'creating'} intruder log file: {e}")
+        else:
+            print(f"Intruder log file exists at: {self.intruder_log_file}")
+
     def initialize_log_counter(self):
         """Initialize log counter based on existing log entries."""
         try:
@@ -435,9 +453,10 @@ class FacialRecognitionSystem:
             print(f"Error initializing log counter: {e}")
 
     def reset_logs(self):
-        """Reset log file and counter to start from 1."""
+        """Reset log files and counter to start from 1."""
         self.init_log_file(reset=True)
-        print("Log file has been reset. Numbering will start from 1.")
+        self.init_intruder_log_file(reset=True)
+        print("Log files have been reset. Numbering will start from 1.")
 
     def load_known_faces(self):
         """Load known faces from the known_faces directory."""
@@ -486,17 +505,26 @@ class FacialRecognitionSystem:
             print(f"Error writing to log file: {e}")
 
     def save_intruder_image(self, frame):
-        """Save unknown face as intruder with timestamp."""
+        """Save unknown face as intruder with timestamp and log the detection."""
         now = datetime.now()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
         filename = f"intruder_{timestamp}.jpg"
         filepath = os.path.join(self.intruder_dir, filename)
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%H:%M:%S")
 
         try:
+            # Save the intruder image
             cv2.imwrite(filepath, frame)
             print(f"Intruder detected at {now.strftime('%Y-%m-%d %H:%M:%S')}")
+
+            # Log the intruder detection to CSV
+            with open(self.intruder_log_file, 'a', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow([date_str, time_str, filepath])
+
         except Exception as e:
-            print(f"Error saving intruder image: {e}")
+            print(f"Error saving intruder image or log: {e}")
 
 
 if __name__ == "__main__":
